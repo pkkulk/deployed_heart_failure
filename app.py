@@ -1,56 +1,58 @@
 import streamlit as st
-import joblib
-import numpy as np
 import pandas as pd
+import joblib
 
-# Load model and columns
+# Load model, scaler, and training columns
 model = joblib.load("heart_model.pkl")
-columns = joblib.load("columns.pkl")  # list of columns used during training
+scaler = joblib.load("scaler.pkl")
+columns = joblib.load("columns.pkl")  # This should be the final df.columns after get_dummies()
 
-st.title("💓 Heart Disease Prediction App")
+st.title("❤️ Heart Disease Risk Prediction App")
 
-# User input form
-def user_input():
-    age = st.slider("Age", 20, 100, 50)
-    sex = st.selectbox("Sex", ["M", "F"])
-    chest_pain = st.selectbox("Chest Pain Type", ["TA", "ATA", "NAP", "ASY"])
-    trestbps = st.slider("Resting BP", 80, 200, 120)
-    chol = st.slider("Cholesterol", 100, 600, 200)
-    fbs = st.selectbox("FastingBS > 120", ["Yes", "No"])
-    restecg = st.selectbox("Resting ECG", ["Normal", "ST", "LVH"])
-    thalach = st.slider("Max Heart Rate", 60, 220, 150)
-    exang = st.selectbox("Exercise Induced Angina", ["Yes", "No"])
-    oldpeak = st.slider("Oldpeak (ST depression)", 0.0, 6.0, 1.0, step=0.1)
-    slope = st.selectbox("Slope of ST segment", ["Up", "Flat", "Down"])
+# User inputs
+age = st.slider("Age", 20, 100, 50)
+sex = st.selectbox("Sex", ["M", "F"])
+chest_pain = st.selectbox("Chest Pain Type", ["TA", "ATA", "NAP", "ASY"])
+resting_bp = st.slider("Resting Blood Pressure", 80, 200, 120)
+cholesterol = st.slider("Cholesterol", 100, 600, 200)
+fasting_bs = st.selectbox("Fasting Blood Sugar > 120 mg/dL", ["Yes", "No"])
+resting_ecg = st.selectbox("Resting ECG", ["Normal", "ST", "LVH"])
+max_hr = st.slider("Maximum Heart Rate", 60, 220, 150)
+exercise_angina = st.selectbox("Exercise-Induced Angina", ["Yes", "No"])
+oldpeak = st.slider("Oldpeak (ST depression)", 0.0, 6.0, 1.0, step=0.1)
+st_slope = st.selectbox("ST Slope", ["Up", "Flat", "Down"])
 
-    data = {
-        "Age": age,
-        "Sex": sex,
-        "ChestPainType": chest_pain,
-        "RestingBP": trestbps,
-        "Cholesterol": chol,
-        "FastingBS": 1 if fbs == "Yes" else 0,
-        "RestingECG": restecg,
-        "MaxHR": thalach,
-        "ExerciseAngina": 1 if exang == "Yes" else 0,
-        "Oldpeak": oldpeak,
-        "ST_Slope": slope
-    }
-    return pd.DataFrame([data])
+# Convert inputs to dataframe
+input_data = {
+    "Age": age,
+    "Sex": sex,
+    "ChestPainType": chest_pain,
+    "RestingBP": resting_bp,
+    "Cholesterol": cholesterol,
+    "FastingBS": 1 if fasting_bs == "Yes" else 0,
+    "RestingECG": resting_ecg,
+    "MaxHR": max_hr,
+    "ExerciseAngina": 1 if exercise_angina == "Yes" else 0,
+    "Oldpeak": oldpeak,
+    "ST_Slope": st_slope
+}
 
-# Process input
-input_df = user_input()
+input_df = pd.DataFrame([input_data])
 
-# Match training encoding
-full_df = pd.get_dummies(input_df)
-full_df = full_df.reindex(columns=columns, fill_value=0)
+# One-hot encode + reindex (matches training)
+input_encoded = pd.get_dummies(input_df)
+input_encoded = input_encoded.reindex(columns=columns, fill_value=0)
+
+# Scale input
+input_scaled = scaler.transform(input_encoded)
 
 # Predict
-if st.button("Predict"):
-    prediction = model.predict(full_df)[0]
-    proba = model.predict_proba(full_df)[0][1]
+prediction = model.predict(input_scaled)[0]
+prob = model.predict_proba(input_scaled)[0][1]
 
-    if prediction == 1:
-        st.error(f"⚠️ High risk of Heart Disease! (Confidence: {proba:.2f})")
-    else:
-        st.success(f"✅ Low risk of Heart Disease. (Confidence: {1 - proba:.2f})")
+# Output
+st.subheader("Prediction Result:")
+if prediction == 1:
+    st.error(f"⚠️ High Risk of Heart Disease ({prob:.2f} probability)")
+else:
+    st.success(f"✅ Low Risk of Heart Disease ({1 - prob:.2f} probability)")
